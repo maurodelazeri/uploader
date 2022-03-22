@@ -1,11 +1,13 @@
 package api
 
 import (
+	"errors"
 	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 
 	echo "github.com/labstack/echo/v4"
 )
@@ -24,31 +26,49 @@ func readFileBody(file *multipart.FileHeader) ([]byte, error) {
 	return body, nil
 }
 
+func makeDirectoryIfNotExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return os.Mkdir(path, os.ModeDir|0755)
+	}
+	return nil
+}
+
 func Upload(c echo.Context) error {
 	req := c.Request()
 	headers := req.Header
 	bucketName := headers.Get("bucketName")
 	objectName := headers.Get("objectName")
+
+	if len(bucketName) == 0 || len(objectName) == 0 {
+		return errors.New("bucketName or objectName empty")
+	}
+
+	s := strings.Split("/storage/"+bucketName+"/"+objectName, "/")
+	path := ""
+	index := 0
+	for index < len(s)-1 {
+		path += s[index] + "/"
+		index++
+	}
+
+	err := makeDirectoryIfNotExists(path)
+	if err != nil {
+		return errors.New("err creating DIR " + err.Error())
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
-		log.Println("problem to read from file:", err)
-		return err
+		return errors.New("err 0" + err.Error())
 	}
 	data, err := readFileBody(file)
 	if err != nil {
-		return err
+		return errors.New("err 1" + err.Error())
 	}
-	if _, err := os.Stat("/storage/" + bucketName); os.IsNotExist(err) {
-		err := os.Mkdir("/storage/"+bucketName, os.ModeDir)
-		if err != nil {
-			log.Println("problem create storage file path:", err)
-			return err
-		}
-	}
+
 	f, err := os.Create("/storage/" + bucketName + "/" + objectName)
 	if err != nil {
-		log.Println("problem create storage file:", err)
-		return err
+		return errors.New("err 2 " + "/storage/" + bucketName + "/" + objectName + " " + err.Error())
+		//return err
 	}
 	defer f.Close()
 	f.Write(data)
