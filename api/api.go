@@ -38,6 +38,13 @@ func Upload(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if _, err := os.Stat("/storage/" + bucketName); os.IsNotExist(err) {
+		err := os.Mkdir("/storage/"+bucketName, os.ModeDir)
+		if err != nil {
+			log.Println("problem create storage file path:", err)
+			return err
+		}
+	}
 	f, err := os.Create("/storage/" + bucketName + "/" + objectName)
 	if err != nil {
 		log.Println("problem create storage file:", err)
@@ -45,5 +52,5 @@ func Upload(c echo.Context) error {
 	}
 	defer f.Close()
 	f.Write(data)
-	return c.JSON(http.StatusOK, `{"status":"ok"}`)
+	return c.JSON(http.StatusOK, "ok")
 }
